@@ -7,9 +7,6 @@
 // Comment this line out for the final version (terse output in the serial monitor)
 #define VERBOSE
 
-// Comment this out to re-enable connection signalling on pin 8
-//#define CONNECT_SIGNALLING
-
 BLECharacteristic *pCharacteristic;
  
 // See the following for generating UUIDs:
@@ -121,9 +118,6 @@ Monitor monitor;
 void setup()
 {
   Serial.begin(115200);
-  Serial.println(myFilter.getResult());
-  Serial.println(myFilter.getProcessNoise());
-  Serial.println(myFilter.getSensorNoise());
 
   // Create the BLE Device
   BLEDevice::init("Esp-32");
