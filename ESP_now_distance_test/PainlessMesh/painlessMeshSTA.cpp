@@ -119,8 +119,6 @@ void ICACHE_FLASH_ATTR StationScan::scanComplete() {
     // Filter out all AP's that are known (eg; added to network already)
     filterAPs();
 
-    lastAPs = aps;
-
     // Next task is to sort by strength
     task.yield([this] {
       aps.sort([](WiFi_AP_Record_t a, WiFi_AP_Record_t b) {
