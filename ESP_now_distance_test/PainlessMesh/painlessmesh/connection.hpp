@@ -4,10 +4,10 @@
 #include <list>
 
 #include "Arduino.h"
-#include "configuration.hpp"
+#include "painlessmesh/configuration.hpp"
 
-#include "buffer.hpp"
-#include "logger.hpp"
+#include "painlessmesh/buffer.hpp"
+#include "painlessmesh/logger.hpp"
 
 extern painlessmesh::logger::LogClass Log;
 

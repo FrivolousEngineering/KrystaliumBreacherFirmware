@@ -3,7 +3,7 @@
 
 #include <string>
 
-#include "configuration.hpp"
+#include "painlessmesh/configuration.hpp"
 
 namespace painlessmesh {
   namespace base64 {

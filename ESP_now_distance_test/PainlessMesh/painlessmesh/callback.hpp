@@ -3,10 +3,10 @@
 
 #include <map>
 
-#include "configuration.hpp"
+#include "painlessmesh/configuration.hpp"
 
-#include "logger.hpp"
-#include "protocol.hpp"
+#include "painlessmesh/logger.hpp"
+#include "painlessmesh/protocol.hpp"
 
 extern painlessmesh::logger::LogClass Log;
 

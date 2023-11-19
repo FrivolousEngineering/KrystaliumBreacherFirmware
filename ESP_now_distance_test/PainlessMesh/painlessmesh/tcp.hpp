@@ -4,9 +4,9 @@
 #include <list>
 
 #include "Arduino.h"
-#include "configuration.hpp"
+#include "painlessmesh/configuration.hpp"
 
-#include "logger.hpp"
+#include "painlessmesh/logger.hpp"
 
 namespace painlessmesh {
 namespace tcp {

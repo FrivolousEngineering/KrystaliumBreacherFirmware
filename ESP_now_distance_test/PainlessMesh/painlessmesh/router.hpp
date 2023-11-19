@@ -4,10 +4,10 @@
 #include <algorithm>
 #include <map>
 
-#include "callback.hpp"
-#include "layout.hpp"
-#include "logger.hpp"
-#include "protocol.hpp"
+#include "painlessmesh/callback.hpp"
+#include "painlessmesh/layout.hpp"
+#include "painlessmesh/logger.hpp"
+#include "painlessmesh/protocol.hpp"
 
 extern painlessmesh::logger::LogClass Log;
 
