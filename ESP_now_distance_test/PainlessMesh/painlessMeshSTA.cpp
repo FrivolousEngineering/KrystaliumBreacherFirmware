@@ -73,8 +73,7 @@ void ICACHE_FLASH_ATTR StationScan::scanComplete() {
     task.forceNextIteration();
     return;
   } else if (num == WIFI_SCAN_RUNNING) {
-    Log(ERROR,
-        "scanComplete should never be called when scan is still running.\n");
+    Log(ERROR, "scanComplete should never be called when scan is still running.\n");
     return;
   }
 
@@ -104,7 +103,7 @@ void ICACHE_FLASH_ATTR StationScan::scanComplete() {
   Log(CONNECTION, "\tFound %d nodes\n", aps.size());
 
   task.yield([this]() {
-    // Task filter all unknown
+    // Filter out all AP's that are known (eg; added to network already)
     filterAPs();
 
     lastAPs = aps;
@@ -160,9 +159,7 @@ void ICACHE_FLASH_ATTR StationScan::connectToAP() {
 
   if (manual) {
     if ((WiFi.SSID() == ssid) && WiFi.status() == WL_CONNECTED) {
-      Log(CONNECTION,
-          "connectToAP(): Already connected using manual connection. "
-          "Disabling scanning.\n");
+      Log(CONNECTION,"connectToAP(): Already connected using manual connection. Disabling scanning.\n");
       task.disable();
       return;
     } else {
@@ -182,31 +179,26 @@ void ICACHE_FLASH_ATTR StationScan::connectToAP() {
     if (WiFi.status() == WL_CONNECTED &&
         !(mesh->shouldContainRoot && !layout::isRooted(mesh->asNodeTree()))) {
       // if already connected -> scan slow
-      Log(CONNECTION,
-          "connectToAP(): Already connected, and no unknown nodes found: "
-          "scan rate set to slow\n");
+      Log(CONNECTION, "connectToAP(): Already connected, and no unknown nodes found: scan rate set to slow\n");
       task.delay(random(2, 4) * SCAN_INTERVAL);
     } else {
       // else scan fast (SCAN_INTERVAL)
-      Log(CONNECTION,
-          "connectToAP(): No unknown nodes found scan rate set to "
-          "normal\n");
+      Log(CONNECTION, "connectToAP(): No unknown nodes found scan rate set to normal\n");
       task.setInterval(0.5 * SCAN_INTERVAL);
     }
     mesh->stability += min(1000 - mesh->stability, (size_t)25);
   } else {
     if (WiFi.status() == WL_CONNECTED) {
-      Log(CONNECTION,
-          "connectToAP(): Unknown nodes found. Current stability: %s\n",
-          String(mesh->stability).c_str());
+      Log(CONNECTION, "connectToAP(): Unknown nodes found. Current stability: %s\n",String(mesh->stability).c_str());
 
       int prob = mesh->stability;
       if (!mesh->shouldContainRoot)
+      {
         // Slower when part of bigger network
         prob /= 2 * (1 + layout::size(mesh->asNodeTree()));
+      }
       if (!layout::isRooted(mesh->asNodeTree()) && random(0, 1000) < prob) {
-        Log(CONNECTION, "connectToAP(): Reconfigure network: %s\n",
-            String(prob).c_str());
+        Log(CONNECTION, "connectToAP(): Reconfigure network: %s\n", String(prob).c_str());
         // close STA connection, this will trigger station disconnect which
         // will trigger connectToAP()
         mesh->closeConnectionSTA();
@@ -215,11 +207,12 @@ void ICACHE_FLASH_ATTR StationScan::connectToAP() {
         // and reset the connecting
         task.delay(3 * SCAN_INTERVAL);
       } else {
-        if (mesh->shouldContainRoot)
+        if (mesh->shouldContainRoot) {
           // Increase scanning rate, because we want to find root
           task.delay(0.5 * SCAN_INTERVAL);
-        else
+        } else {
           task.delay(random(2, 4) * SCAN_INTERVAL);
+        }
       }
     } else {
       // Else try to connect to first
@@ -228,9 +221,7 @@ void ICACHE_FLASH_ATTR StationScan::connectToAP() {
                         // we can try the next one
       requestIP(ap);
       // Trying to connect, if that fails we will reconnect later
-      Log(CONNECTION,
-          "connectToAP(): Trying to connect, scan rate set to "
-          "4*normal\n");
+      Log(CONNECTION, "connectToAP(): Trying to connect, scan rate set to 4 * normal\n");
       task.delay(2 * SCAN_INTERVAL);
     }
   }

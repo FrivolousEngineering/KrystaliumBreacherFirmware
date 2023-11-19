@@ -60,7 +60,7 @@ void sendMessage() {
   msg += " " + String(getDistance(rssi_average)) + " meter and RSSI_avg " + rssi_average + " rssi_cur " + last_wifi_rssi;
   mesh.sendBroadcast( msg );
 
-  Serial.println("Sending message: " + msg);
+  Serial.println("Sending message: " + msg);  
   taskSendMessage.setInterval(TASK_SECOND * 5);
 }
 void printSubConnection()
