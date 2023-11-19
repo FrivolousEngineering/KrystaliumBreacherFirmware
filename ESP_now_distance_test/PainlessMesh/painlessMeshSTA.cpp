@@ -97,8 +97,8 @@ void ICACHE_FLASH_ATTR StationScan::scanComplete() {
 
     memcpy((void *)&record.bssid, (void *)WiFi.BSSID(i), sizeof(record.bssid));
     aps.push_back(record);
-    Log(CONNECTION, "\tfound : %s, %ddBm\n", record.ssid.c_str(),
-        (int16_t)record.rssi);
+    Log(CONNECTION, "\tfound : %s, %ddBm node_id: %u\n", record.ssid.c_str(),
+        (int16_t)record.rssi, painlessmesh::tcp::encodeNodeId(record.bssid));
   }
 
   Log(CONNECTION, "\tFound %d nodes\n", aps.size());
@@ -112,6 +112,17 @@ void ICACHE_FLASH_ATTR StationScan::scanComplete() {
     // Next task is to sort by strength
     task.yield([this] {
       aps.sort([](WiFi_AP_Record_t a, WiFi_AP_Record_t b) {
+        #ifdef ROOT_ID
+          // Ensure that the root node is on top
+          if(painlessmesh::tcp::encodeNodeId(a.bssid) == ROOT_ID)
+          {
+            return true;
+          }
+          if(painlessmesh::tcp::encodeNodeId(b.bssid) == ROOT_ID)
+          {
+            return false;
+          }
+        #endif
         return a.rssi > b.rssi;
       });
       // Next task is to connect to the top ap
@@ -224,4 +235,4 @@ void ICACHE_FLASH_ATTR StationScan::connectToAP() {
     }
   }
 }
-#endif
+#endif  

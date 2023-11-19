@@ -6,6 +6,7 @@
 
 #include "painlessTaskOptions.h"
 
+
 #include <TaskSchedulerDeclarations.h>
 
 #define ARDUINOJSON_USE_LONG_LONG 1
@@ -15,6 +16,8 @@
 
 // Enable (arduino) wifi support
 #define PAINLESSMESH_ENABLE_ARDUINO_WIFI
+
+#define ROOT_ID 4225251478
 
 // Enable OTA support
 #define PAINLESSMESH_ENABLE_OTA

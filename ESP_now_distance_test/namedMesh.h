@@ -1,6 +1,6 @@
 #include<map>
 
-#include "PainlessMesh/painlessMesh.h"
+#include "painlessMesh.h"
 using namespace painlessmesh;
 
 typedef std::function<void(String &from, String &msg)> namedReceivedCallback_t;
@@ -68,7 +68,7 @@ class namedMesh : public painlessMesh {
                             DynamicJsonBuffer jsonBuffer;
                             JsonObject& root = jsonBuffer.createObject();
                             root["topic"] = "nameBroadCast";
-                            root["name"] = this->getName();
+                            root["name"] = this->getName(); 
                             root.printTo(msg);
 #endif
                             this->sendBroadcast(msg);

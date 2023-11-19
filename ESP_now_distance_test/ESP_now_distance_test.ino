@@ -1,4 +1,5 @@
-#define ROOT_ID 4225251478
+// NOTE; In order for the namedmesh to work, you need to simlink the files into the arduino folder. What i did; I downloaded the painless mesh and replaced the src folder with the
+//painless mesh version that i've added
 
 #include "namedMesh.h" // Use a variant of the painless mesh that allows for names instead of just unique ID's
 #include "kalman_simple.h"
@@ -142,6 +143,14 @@ void setup() {
 
   userScheduler.addTask( taskPrintSubConnection );
   taskPrintSubConnection.enable();
+  
+  if(mesh.isRoot())
+  {
+    Serial.println("This device is root, starting printNetworkTask");
+    
+  } else {
+    Serial.println("This device is not setup to be root");
+  }
 }
 
 void loop() {
