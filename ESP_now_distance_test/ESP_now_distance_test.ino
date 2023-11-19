@@ -1,4 +1,7 @@
+#define ROOT_ID 4225251478
+
 #include "namedMesh.h" // Use a variant of the painless mesh that allows for names instead of just unique ID's
+#include "kalman_simple.h"
 
 #define   MESH_PREFIX     "KrystaliumBreacher"
 #define   MESH_PASSWORD   "somekindofpassword"
@@ -7,16 +10,32 @@
 Scheduler userScheduler; // to control your personal task
 namedMesh  mesh;
 
+Kalman myFilter(0.08, 50, 50, -50.);
+
 // Prototype functions
 void sendMessage() ; 
 void printSubConnection();
 void printWifiRSSI();
+void calculateDistanceFromRSSI();
 
 String nodeName;
 
 Task taskSendMessage( TASK_SECOND * 1 , TASK_FOREVER, &sendMessage );
 Task taskPrintSubConnection(TASK_SECOND * 1, TASK_FOREVER, &printSubConnection);
 Task printWifiRSSITask(TASK_SECOND * 1, TASK_FOREVER, &printWifiRSSI);
+Task calculateDistanceFromRSSITask(TASK_SECOND * 0.5, TASK_FOREVER, &calculateDistanceFromRSSI);
+
+
+float reference_power  = -54; // rssi reference (Power at 1 meter)
+float distance_factor = 3.5; 
+
+double rssi_average = -50.0;
+double last_wifi_rssi = -50;
+
+float getDistance(const float rssi)
+{ 
+  return pow(10, (reference_power - rssi) / (10 * distance_factor)); 
+}
 
 void printWifiRSSI()
 {
@@ -24,14 +43,20 @@ void printWifiRSSI()
     //Serial.println("WiFi signal: " + String(WiFi.RSSI()) + " db");
 }
 
+void calculateDistanceFromRSSI()
+{
+  last_wifi_rssi = (double)WiFi.RSSI();
+  rssi_average = (double)myFilter.getFilteredValue(last_wifi_rssi);
+}
+
 void sendMessage() {
   if(mesh.isRoot())
   {
     return;
   }
-  String msg = "RSSI from node ";
+  String msg = "Estimated distance from node ";
   msg += mesh.getNodeId();
-  msg += " " + String(WiFi.RSSI()) + " db";
+  msg += " " + String(getDistance(rssi_average)) + " meter and RSSI_avg " + rssi_average + " rssi_cur " + last_wifi_rssi;
   mesh.sendBroadcast( msg );
   taskSendMessage.setInterval(TASK_SECOND * 5);
 }
@@ -110,15 +135,13 @@ void setup() {
 
   userScheduler.addTask(printWifiRSSITask);
   printWifiRSSITask.enable();
-  
-  if(mesh.isRoot())
-  {
-    Serial.println("This device is root, starting printNetworkTask");
-    userScheduler.addTask( taskPrintSubConnection );
-    taskPrintSubConnection.enable();
-  } else {
-    Serial.println("This device is not setup to be root");
-  }
+
+  userScheduler.addTask(calculateDistanceFromRSSITask);
+  calculateDistanceFromRSSITask.enable();
+
+
+  userScheduler.addTask( taskPrintSubConnection );
+  taskPrintSubConnection.enable();
 }
 
 void loop() {
