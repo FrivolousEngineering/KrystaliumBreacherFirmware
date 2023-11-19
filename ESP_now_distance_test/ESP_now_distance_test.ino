@@ -21,7 +21,7 @@ Task printWifiRSSITask(TASK_SECOND * 1, TASK_FOREVER, &printWifiRSSI);
 void printWifiRSSI()
 {
 
-    Serial.println("WiFi signal: " + String(WiFi.RSSI()) + " db");
+    //Serial.println("WiFi signal: " + String(WiFi.RSSI()) + " db");
 }
 
 void sendMessage() {
@@ -63,8 +63,26 @@ void setup() {
 
   //mesh.setDebugMsgTypes( ERROR | MESH_STATUS | CONNECTION | SYNC | COMMUNICATION | GENERAL | MSG_TYPES | REMOTE ); // all types on
   mesh.setDebugMsgTypes( ERROR | CONNECTION | MESH_STATUS);  // set before init() so that you can see startup messages
+  
+  uint8_t MAC[] = {0, 0, 0, 0, 0, 0};
+  WiFi.softAPmacAddress(MAC);
+  uint32_t nodeId = tcp::encodeNodeId(MAC);
+  Serial.println(nodeId);
+  if(nodeId == 4225251478)
+  {
+    // This means that it is the generator and we want it to start in AP mode. 
+    // The reason for this is that we want devices to connect to the generator. We don't want the generator to connect to the devices.
+    // If a generator connects to a device, the device can't broadcast the RSSI back, since it will always report "31 db" since it's not connected, something
+    // is connecting to it. 
+    Serial.println("Starting in WIFI_AP mode");
+    mesh.init(MESH_PREFIX, MESH_PASSWORD, &userScheduler, MESH_PORT, WIFI_AP);
+  } else {
+    Serial.println("Starting in WIFI_AP_STA mode");
+    mesh.init(MESH_PREFIX, MESH_PASSWORD, &userScheduler, MESH_PORT, WIFI_AP_STA);
+  }
 
-  mesh.init(MESH_PREFIX, MESH_PASSWORD, &userScheduler, MESH_PORT);
+
+  //mesh.init(MESH_PREFIX, MESH_PASSWORD, &userScheduler, MESH_PORT);
   nodeName = findName(mesh.getNodeId());
   mesh.setName(nodeName);
 
