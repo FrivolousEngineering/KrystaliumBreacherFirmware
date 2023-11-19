@@ -67,6 +67,19 @@ void ICACHE_FLASH_ATTR StationScan::scanComplete() {
   aps.clear();
   Log(CONNECTION, "scanComplete():-- > Cleared old APs.\n");
 
+  #ifdef ROOT_ID
+    if(painlessmesh::tcp::encodeNodeId(WiFi.BSSID()) == ROOT_ID && 
+        WiFi.RSSI() >= PREFERED_ROOT_STRENGTH && 
+        WiFi.RSSI() < 0) // Sometimes it gets confused and gets a positive RSSI, so ignore that
+    {
+      // Nothing to do. We are already connected with root and it has a decent signal strength! 
+      Log(CONNECTION, "Not scanning, already directly connected to root with decent RSSI\n");  
+      task.delay(random(2, 4) * SCAN_INTERVAL);
+      return;
+    }
+
+  #endif
+
   auto num = WiFi.scanComplete();
   if (num == WIFI_SCAN_FAILED) {
     Log(ERROR, "wifi scan failed. Retrying....\n");
@@ -113,11 +126,11 @@ void ICACHE_FLASH_ATTR StationScan::scanComplete() {
       aps.sort([](WiFi_AP_Record_t a, WiFi_AP_Record_t b) {
         #ifdef ROOT_ID
           // Ensure that the root node is on top, but only if it's signal strength isn't too low. 
-          if(painlessmesh::tcp::encodeNodeId(a.bssid) == ROOT_ID && a.rssi > -90)
+          if(painlessmesh::tcp::encodeNodeId(a.bssid) == ROOT_ID && a.rssi > PREFERED_ROOT_STRENGTH)
           {
             return true;
           }
-          if(painlessmesh::tcp::encodeNodeId(b.bssid) == ROOT_ID && b.rssi > -90)
+          if(painlessmesh::tcp::encodeNodeId(b.bssid) == ROOT_ID && b.rssi > PREFERED_ROOT_STRENGTH)
           {
             return false;
           }
