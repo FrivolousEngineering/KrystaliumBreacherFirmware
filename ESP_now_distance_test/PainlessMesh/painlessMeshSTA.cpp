@@ -113,12 +113,12 @@ void ICACHE_FLASH_ATTR StationScan::scanComplete() {
     task.yield([this] {
       aps.sort([](WiFi_AP_Record_t a, WiFi_AP_Record_t b) {
         #ifdef ROOT_ID
-          // Ensure that the root node is on top
-          if(painlessmesh::tcp::encodeNodeId(a.bssid) == ROOT_ID)
+          // Ensure that the root node is on top, but only if it's signal strength isn't too low. 
+          if(painlessmesh::tcp::encodeNodeId(a.bssid) == ROOT_ID && a.rssi > -90)
           {
             return true;
           }
-          if(painlessmesh::tcp::encodeNodeId(b.bssid) == ROOT_ID)
+          if(painlessmesh::tcp::encodeNodeId(b.bssid) == ROOT_ID && b.rssi > -90)
           {
             return false;
           }
