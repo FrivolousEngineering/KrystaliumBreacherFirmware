@@ -68,7 +68,7 @@ class namedMesh : public painlessMesh {
                             DynamicJsonBuffer jsonBuffer;
                             JsonObject& root = jsonBuffer.createObject();
                             root["topic"] = "nameBroadCast";
-                            root["name"] = this->getName();
+                            root["name"] = this->getName(); 
                             root.printTo(msg);
 #endif
                             this->sendBroadcast(msg);
