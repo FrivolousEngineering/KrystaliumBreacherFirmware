@@ -1,6 +1,6 @@
 #include<map>
 
-#include "painlessMesh.h"
+#include "PainlessMesh/painlessMesh.h"
 using namespace painlessmesh;
 
 typedef std::function<void(String &from, String &msg)> namedReceivedCallback_t;
@@ -117,4 +117,3 @@ class namedMesh : public painlessMesh {
         bool nameBroadCastInit = false;
         Task nameBroadCastTask;
 };
-
