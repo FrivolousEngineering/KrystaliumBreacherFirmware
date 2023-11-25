@@ -22,6 +22,9 @@
 // How strong should signal to root be to prefer it?
 #define PREFERED_ROOT_STRENGTH -90
 
+// At what point should the network just not even be attempted?
+#define MAX_NETWORK_STRENGTH -90
+
 // Enable OTA support
 #define PAINLESSMESH_ENABLE_OTA
 

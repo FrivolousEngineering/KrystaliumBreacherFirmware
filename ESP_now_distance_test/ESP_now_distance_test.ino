@@ -4,6 +4,8 @@
 #include "namedMesh.h" // Use a variant of the painless mesh that allows for names instead of just unique ID's
 #include "kalman_simple.h"
 
+#include <Adafruit_NeoPixel.h>
+
 #define   MESH_PREFIX     "KrystaliumBreacher"
 #define   MESH_PASSWORD   "somekindofpassword"
 #define   MESH_PORT       5555
@@ -11,7 +13,9 @@
 Scheduler userScheduler; // to control your personal task
 namedMesh  mesh;
 
-Kalman myFilter(0.08, 50, 50, -50.);
+Kalman myFilter(0.15, 20, 20, -50.);
+
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(12, D1, NEO_GRB + NEO_KHZ800);
 
 // Prototype functions
 void sendMessage() ; 
@@ -48,6 +52,18 @@ void calculateDistanceFromRSSI()
 {
   last_wifi_rssi = (double)WiFi.RSSI();
   rssi_average = (double)myFilter.getFilteredValue(last_wifi_rssi);
+  // Hacked in there. Yaaay
+  for(int i = 0; i < 12; i++)
+  {
+    if(i < getDistance(rssi_average))
+    {
+      strip.setPixelColor(i, 80, 0, 0); 
+    } else
+    {
+      strip.setPixelColor(i,0,0,0);
+    } 
+  }
+  strip.show();
 }
 
 void sendMessage() {
@@ -90,7 +106,7 @@ void setup() {
   Serial.begin(115200);
 
   //mesh.setDebugMsgTypes( ERROR | MESH_STATUS | CONNECTION | SYNC | COMMUNICATION | GENERAL | MSG_TYPES | REMOTE ); // all types on
-  mesh.setDebugMsgTypes( ERROR | CONNECTION | MESH_STATUS);  // set before init() so that you can see startup messages
+  mesh.setDebugMsgTypes( ERROR | CONNECTION);  // set before init() so that you can see startup messages
   
   uint8_t MAC[] = {0, 0, 0, 0, 0, 0};
   WiFi.softAPmacAddress(MAC);
@@ -153,6 +169,8 @@ void setup() {
   } else {
     Serial.println("This device is not setup to be root");
   }
+
+  strip.begin();
 }
 
 void loop() {

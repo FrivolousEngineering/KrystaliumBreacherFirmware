@@ -80,6 +80,18 @@ void ICACHE_FLASH_ATTR StationScan::scanComplete() {
 
   #endif
 
+  if(WiFi.RSSI() < MAX_NETWORK_STRENGTH)
+  {
+    // Disconnect because the network is too weak! 
+    Log(CONNECTION, "Dropping current connection because it's too weak!");
+    mesh->closeConnectionSTA();
+    mesh->stability = 0;  // Discourage switching again
+    // wifiEventCB should be triggered before this delay runs out
+    // and reset the connecting
+    task.delay(3 * SCAN_INTERVAL);
+    return; 
+  }
+
   auto num = WiFi.scanComplete();
   if (num == WIFI_SCAN_FAILED) {
     Log(ERROR, "wifi scan failed. Retrying....\n");
@@ -116,25 +128,40 @@ void ICACHE_FLASH_ATTR StationScan::scanComplete() {
   Log(CONNECTION, "\tFound %d nodes\n", aps.size());
 
   task.yield([this]() {
-    // Filter out all AP's that are known (eg; added to network already)
-    filterAPs();
+    // Sort the AP's. This is done by strength and if it's root 
+    aps.sort([](WiFi_AP_Record_t a, WiFi_AP_Record_t b) {
+      #ifdef ROOT_ID
+        // Ensure that the root node is on top, but only if it's signal strength isn't too low. 
+        if(painlessmesh::tcp::encodeNodeId(a.bssid) == ROOT_ID && a.rssi > PREFERED_ROOT_STRENGTH)
+        {
+          return true;
+        }
+        if(painlessmesh::tcp::encodeNodeId(b.bssid) == ROOT_ID && b.rssi > PREFERED_ROOT_STRENGTH)
+        {
+          return false;
+        }
+      #endif
+      return a.rssi > b.rssi;
+    });
+    task.yield([this] {    
+      #ifdef ROOT_ID
 
-    // Next task is to sort by strength
-    task.yield([this] {
-      aps.sort([](WiFi_AP_Record_t a, WiFi_AP_Record_t b) {
-        #ifdef ROOT_ID
-          // Ensure that the root node is on top, but only if it's signal strength isn't too low. 
-          if(painlessmesh::tcp::encodeNodeId(a.bssid) == ROOT_ID && a.rssi > PREFERED_ROOT_STRENGTH)
-          {
-            return true;
-          }
-          if(painlessmesh::tcp::encodeNodeId(b.bssid) == ROOT_ID && b.rssi > PREFERED_ROOT_STRENGTH)
-          {
-            return false;
-          }
-        #endif
-        return a.rssi > b.rssi;
-      });
+          
+        if (WiFi.status() == WL_CONNECTED && // We are already connected (not to root, because of early out earlier!)
+            painlessmesh::tcp::encodeNodeId(aps.begin()->bssid) == ROOT_ID ) // The best option we found is root! We should disconnect
+        {
+          Log(CONNECTION, "Not connected to root, but saw root in list, disconnecting and rescheduling scan! \n");
+          mesh->closeConnectionSTA();
+          mesh->stability = 0;  // Discourage switching again
+          // wifiEventCB should be triggered before this delay runs out
+          // and reset the connecting
+          task.delay(3 * SCAN_INTERVAL);
+          return; 
+        }
+      #endif
+
+      // Filter out all AP's that are known (eg; added to network already)
+      filterAPs();
       // Next task is to connect to the top ap
       task.yield([this]() { connectToAP(); });
     });
