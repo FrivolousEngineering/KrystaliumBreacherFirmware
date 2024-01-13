@@ -53,11 +53,38 @@ void calculateDistanceFromRSSI()
   last_wifi_rssi = (double)WiFi.RSSI();
   rssi_average = (double)myFilter.getFilteredValue(last_wifi_rssi);
   // Hacked in there. Yaaay
+  if(mesh.isRoot())
+  {
+    // DO NOTHING!
+    return;
+  }
+  int r_factor = 0;
+  int g_factor = 0;
+
+  String parent_name = findName(painlessmesh::tcp::encodeNodeId(WiFi.BSSID()));
+
+  if(parent_name == "generator")
+  {
+    r_factor = 0;
+    g_factor = 1;
+  } else
+  {
+    r_factor = 1;
+    g_factor = 0;
+  }
+
+  if(WiFi.status() != WL_CONNECTED)
+  {
+    r_factor = 0;
+    g_factor = 0;
+  }
+
+  
   for(int i = 0; i < 12; i++)
   {
     if(i < getDistance(rssi_average))
     {
-      strip.setPixelColor(i, 80, 0, 0); 
+      strip.setPixelColor(i, r_factor * 80, g_factor * 80, 0); 
     } else
     {
       strip.setPixelColor(i,0,0,0);
@@ -76,7 +103,7 @@ void sendMessage() {
   msg += " " + String(getDistance(rssi_average)) + " meter and RSSI_avg " + rssi_average + " rssi_cur " + last_wifi_rssi;
   mesh.sendBroadcast( msg );
 
-  Serial.println("Sending message: " + msg);  
+  //Serial.println("Sending message: " + msg);  
   taskSendMessage.setInterval(TASK_SECOND * 5);
 }
 void printSubConnection()
@@ -88,13 +115,13 @@ void printSubConnection()
 String findName(uint32_t node_id)
 {
   // Yeaaah i know. It's a bit ugly hardcoded, but it's for a quick test.
-  if(node_id == 4225251478)
+  if(node_id == 4225178198)
   {
     return "generator";
   } else if(node_id == 4225208703) 
   {
     return "device_a";
-  } else if(node_id == 4225178198)
+  } else if(node_id == 4225251478)
   {
     return "device_b";
   }
@@ -106,13 +133,13 @@ void setup() {
   Serial.begin(115200);
 
   //mesh.setDebugMsgTypes( ERROR | MESH_STATUS | CONNECTION | SYNC | COMMUNICATION | GENERAL | MSG_TYPES | REMOTE ); // all types on
-  mesh.setDebugMsgTypes( ERROR | CONNECTION);  // set before init() so that you can see startup messages
+  mesh.setDebugMsgTypes( ERROR | CONNECTION | SYNC);  // set before init() so that you can see startup messages
   
   uint8_t MAC[] = {0, 0, 0, 0, 0, 0};
   WiFi.softAPmacAddress(MAC);
   uint32_t nodeId = tcp::encodeNodeId(MAC);
   Serial.println(nodeId);
-  if(nodeId == 4225251478)
+  if(nodeId == 4225178198)
   {
     // This means that it is the generator and we want it to start in AP mode. 
     // The reason for this is that we want devices to connect to the generator. We don't want the generator to connect to the devices.
@@ -121,8 +148,8 @@ void setup() {
     Serial.println("Starting in WIFI_AP mode");
     mesh.init(MESH_PREFIX, MESH_PASSWORD, &userScheduler, MESH_PORT, WIFI_AP);
   } else {
-    Serial.println("Starting in WIFI_AP_STA mode");
-    mesh.init(MESH_PREFIX, MESH_PASSWORD, &userScheduler, MESH_PORT, WIFI_AP_STA);
+    Serial.println("Starting in WIFI_STA mode");
+    mesh.init(MESH_PREFIX, MESH_PASSWORD, &userScheduler, MESH_PORT, WIFI_STA);
   }
 
 
@@ -131,7 +158,7 @@ void setup() {
   mesh.setName(nodeName);
 
   mesh.onReceive([](String &from, String &msg) {
-    Serial.printf("Received message by name from: %s, \"%s\"\n", from.c_str(), msg.c_str());
+    //Serial.printf("Received message by name from: %s, \"%s\"\n", from.c_str(), msg.c_str());
   });
 
   mesh.onChangedConnections([]() {
