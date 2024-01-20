@@ -115,13 +115,13 @@ void printSubConnection()
 String findName(uint32_t node_id)
 {
   // Yeaaah i know. It's a bit ugly hardcoded, but it's for a quick test.
-  if(node_id == 4225178198)
+  if(node_id == 4225251478)
   {
     return "generator";
   } else if(node_id == 4225208703) 
   {
     return "device_a";
-  } else if(node_id == 4225251478)
+  } else if(node_id == 4225178198)
   {
     return "device_b";
   }
@@ -139,7 +139,7 @@ void setup() {
   WiFi.softAPmacAddress(MAC);
   uint32_t nodeId = tcp::encodeNodeId(MAC);
   Serial.println(nodeId);
-  if(nodeId == 4225178198)
+  if(nodeId == 4225251478)
   {
     // This means that it is the generator and we want it to start in AP mode. 
     // The reason for this is that we want devices to connect to the generator. We don't want the generator to connect to the devices.
