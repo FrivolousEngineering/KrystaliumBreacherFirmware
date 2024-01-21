@@ -17,7 +17,7 @@
 // Enable (arduino) wifi support
 #define PAINLESSMESH_ENABLE_ARDUINO_WIFI
 
-#define ROOT_ID 4225251478
+#define ROOT_ID 4225132992
 
 // How strong should signal to root be to prefer it?
 #define PREFERED_ROOT_STRENGTH -90

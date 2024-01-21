@@ -518,8 +518,8 @@ class Connection : public painlessmesh::layout::Neighbour,
     using namespace logger;
 
     timeOutTask.set(NODE_TIMEOUT, TASK_ONCE, [self]() {
-      Log(CONNECTION, "Time out reached\n");
-      self->close();
+      Log(CONNECTION, "Time out reached (but no close)\n");
+
     });
     mesh->mScheduler->addTask(timeOutTask);
 

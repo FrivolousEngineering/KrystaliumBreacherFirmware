@@ -1,6 +1,8 @@
 // NOTE; In order for the namedmesh to work, you need to simlink the files into the arduino folder. What i did; I downloaded the painless mesh and replaced the src folder with the
 //painless mesh version that i've added
 
+#include <ESP8266WiFi.h>
+
 #include "namedMesh.h" // Use a variant of the painless mesh that allows for names instead of just unique ID's
 #include "kalman_simple.h"
 
@@ -17,13 +19,13 @@ Kalman myFilter(0.15, 20, 20, -50.);
 
 
 // Number of pixels in the ledring
-#define NUMPIXELS                       12 
+#define NUMPIXELS                       24 
 // If set to 1, it will consider all pixels in the ring as the same. If set to the same number, it will animate each of them individually
-#define NUM_LED_GROUPS                  12 
+#define NUM_LED_GROUPS                  24
 
 // Any unconnected pin, to try to generate a random seed
 #define UNCONNECTED_PIN                 2
-#define LEDRINGPIN                      D2 
+#define LEDRINGPIN                      4 
  
 // The LED can be in only one of these states at any given time
 #define BRIGHT                          0
@@ -69,7 +71,20 @@ Kalman myFilter(0.15, 20, 20, -50.);
 #define MAXVAL(A,B)             (((A) > (B)) ? (A) : (B))
 
 
-#define MAX_DISTANCE_METER               12
+#define MAX_DISTANCE_METER               6
+
+
+// This bizarre construct isn't Arduino code in the conventional sense.
+// It exploits features of GCC's preprocessor to generate a PROGMEM
+// table (in flash memory) holding an an 8-bit gamma-correction table.
+#define _GAMMA_ 2.6
+const int _GBASE_ = __COUNTER__ + 1; // Index of 1st __COUNTER__ ref below
+#define _G1_ pow((__COUNTER__ - _GBASE_) / 255.0, _GAMMA_) * 255.0 + 0.5,
+#define _G2_ _G1_ _G1_ _G1_ _G1_ _G1_ _G1_ _G1_ _G1_ // Expands to 8 items
+#define _G3_ _G2_ _G2_ _G2_ _G2_ _G2_ _G2_ _G2_ _G2_ // Expands to 64 items
+const uint8_t PROGMEM rawTable[] = { _G3_ _G3_ _G3_ _G3_ }; // 256 items
+
+const uint8_t* gammaTable = rawTable;
 
 byte state[NUM_LED_GROUPS];
 unsigned long flicker_msecs[NUM_LED_GROUPS];
@@ -82,16 +97,16 @@ Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUMPIXELS, LEDRINGPIN, NEO_GRB + NEO
 
 
 // Prototype functions
-void sendMessage() ; 
+//void sendMessage() ; 
 void printSubConnection();
 void printWifiRSSI();
 void calculateDistanceFromRSSI();
 
 String nodeName;
 
-Task taskSendMessage( TASK_SECOND * 1 , TASK_FOREVER, &sendMessage );
-Task taskPrintSubConnection(TASK_SECOND * 1, TASK_FOREVER, &printSubConnection);
-Task printWifiRSSITask(TASK_SECOND * 1, TASK_FOREVER, &printWifiRSSI);
+//Task taskSendMessage( TASK_SECOND * 1 , TASK_FOREVER, &sendMessage );
+//Task taskPrintSubConnection(TASK_SECOND * 1, TASK_FOREVER, &printSubConnection);
+//Task printWifiRSSITask(TASK_SECOND * 1, TASK_FOREVER, &printWifiRSSI);
 Task calculateDistanceFromRSSITask(TASK_SECOND * 0.5, TASK_FOREVER, &calculateDistanceFromRSSI);
 
 
@@ -108,44 +123,26 @@ float getDistance(const float rssi)
   return pow(10, (reference_power - rssi) / (10 * distance_factor)); 
 }
 
-void printWifiRSSI()
-{
-    //Serial.println("WiFi signal: " + String(WiFi.RSSI()) + " db");
-}
 
 void calculateDistanceFromRSSI()
 {
   last_wifi_rssi = (double)WiFi.RSSI();
+  Serial.print("wifi_rssi: "); Serial.println(last_wifi_rssi);
   rssi_average = (double)myFilter.getFilteredValue(last_wifi_rssi);
+  Serial.print("wifi_average: "); Serial.println(rssi_average);
+  Serial.print("disance: "); Serial.println(getDistance(rssi_average));
   // Hacked in there. Yaaay
-  if(mesh.isRoot())
-  {
-    // DO NOTHING!
-    return;
-  }
-  intensity_factor = MAXVAL(MINVAL(getDistance(rssi_average) / MAX_DISTANCE_METER, 1), 0);
+
+  intensity_factor = 1 - MAXVAL(MINVAL(getDistance(rssi_average) / MAX_DISTANCE_METER, 1), 0);
   Serial.print("Intensity factor is :");
   Serial.println(intensity_factor);
   strip.show();
 }
 
-void sendMessage() {
-  if(mesh.isRoot())
-  {
-    return;
-  }
-  String msg = "Estimated distance from node ";
-  msg += mesh.getNodeId();
-  msg += " " + String(getDistance(rssi_average)) + " meter and RSSI_avg " + rssi_average + " rssi_cur " + last_wifi_rssi;
-  mesh.sendBroadcast( msg );
-
-  //Serial.println("Sending message: " + msg);  
-  taskSendMessage.setInterval(TASK_SECOND * 5);
-}
 void printSubConnection()
 {
-  Serial.println(mesh.subConnectionJson());
-  taskPrintSubConnection.setInterval(TASK_SECOND * 10);
+  //Serial.println(mesh.subConnectionJson());
+  //taskPrintSubConnection.setInterval(TASK_SECOND * 10);
 }
 
 void setFlickerIntensity(byte intensity, int group_index)
@@ -170,12 +167,17 @@ void setFlickerIntensity(byte intensity, int group_index)
   intensity *= intensity_factor;
   secondary_intensity *= intensity_factor;
   impurity_intensity *= intensity_factor;
+
+  intensity = pgm_read_byte(gammaTable + intensity);
+  secondary_intensity = pgm_read_byte(gammaTable + secondary_intensity);
+  impurity_intensity = pgm_read_byte(gammaTable + impurity_intensity);
   
   for(; led_index < max_led_index; led_index++)
   {
     strip.setPixelColor(led_index, impurity_intensity, secondary_intensity, intensity); 
   }
-    
+
+  
   strip.show();
   return;
 }
@@ -205,13 +207,13 @@ void setupNeoPixel()
 String findName(uint32_t node_id)
 {
   // Yeaaah i know. It's a bit ugly hardcoded, but it's for a quick test.
-  if(node_id == 4225251478)
+  if(node_id == 844612482)
   {
     return "generator";
   } else if(node_id == 4225208703) 
   {
     return "device_a";
-  } else if(node_id == 4225178198)
+  } else if(node_id == 4225251478)
   {
     return "device_b";
   }
@@ -224,39 +226,63 @@ void setup()
   Serial.begin(115200);
 
   //mesh.setDebugMsgTypes( ERROR | MESH_STATUS | CONNECTION | SYNC | COMMUNICATION | GENERAL | MSG_TYPES | REMOTE ); // all types on
-  mesh.setDebugMsgTypes( ERROR | CONNECTION | SYNC);  // set before init() so that you can see startup messages
+  //mesh.setDebugMsgTypes( ERROR | CONNECTION | SYNC);  // set before init() so that you can see startup messages
   
   uint8_t MAC[] = {0, 0, 0, 0, 0, 0};
   WiFi.softAPmacAddress(MAC);
-  uint32_t nodeId = tcp::encodeNodeId(MAC);
+  uint32_t nodeId = tcp::encodeNodeId(MAC); 
   Serial.println(nodeId);
-  if(nodeId == 4225251478)
+
+
+  
+  if(nodeId == 844612482)
   {
-    // This means that it is the generator and we want it to start in AP mode. 
-    // The reason for this is that we want devices to connect to the generator. We don't want the generator to connect to the devices.
-    // If a generator connects to a device, the device can't broadcast the RSSI back, since it will always report "31 db" since it's not connected, something
-    // is connecting to it. 
+    Serial.println("Server!");
+    WiFi.softAP(MESH_PREFIX, MESH_PASSWORD);             // Start the access point
+    Serial.print("Access Point \"");
+    Serial.print(MESH_PREFIX);
+    Serial.println("\" started");
+  
+    Serial.print("IP address:\t");
+    Serial.println(WiFi.softAPIP());         // Send the IP address of the ESP8266 to the computer 
     Serial.println("Starting in WIFI_AP mode");
-    mesh.init(MESH_PREFIX, MESH_PASSWORD, &userScheduler, MESH_PORT, WIFI_AP);
+    //mesh.init(MESH_PREFIX, MESH_PASSWORD, &userScheduler, MESH_PORT, WIFI_AP);
   } else {
     Serial.println("Starting in WIFI_STA mode");
-    mesh.init(MESH_PREFIX, MESH_PASSWORD, &userScheduler, MESH_PORT, WIFI_STA);
+    Serial.println("generator!");
+    WiFi.setAutoReconnect(true);
+    WiFi.persistent(true);
+    WiFi.begin(MESH_PREFIX, MESH_PASSWORD); 
+    Serial.print("Connecting to ");
+    Serial.print(MESH_PREFIX); Serial.println(" ...");
+
+    int i = 0;
+    while (WiFi.status() != WL_CONNECTED) { // Wait for the Wi-Fi to connect
+      delay(1000);
+      Serial.print(++i); Serial.print(' ');
+    }
+
+    Serial.println('\n');
+    Serial.println("Connection established!");  
+    Serial.print("IP address:\t");
+    Serial.println(WiFi.localIP()); 
+    //mesh.init(MESH_PREFIX, MESH_PASSWORD, &userScheduler, MESH_PORT, WIFI_STA);
   }
 
   //mesh.init(MESH_PREFIX, MESH_PASSWORD, &userScheduler, MESH_PORT);
-  nodeName = findName(mesh.getNodeId());
-  mesh.setName(nodeName);
+  //nodeName = findName(mesh.getNodeId());
+  //mesh.setName(nodeName);
 
-  mesh.onReceive([](String &from, String &msg) {
+  //mesh.onReceive([](String &from, String &msg) {
     //Serial.printf("Received message by name from: %s, \"%s\"\n", from.c_str(), msg.c_str());
-  });
+  //});
 
-  mesh.onChangedConnections([]() {
-    Serial.printf("Changed connection\n");
-  });
+  //mesh.onChangedConnections([]() {
+  //  Serial.printf("Changed connection\n");
+//  /});
 
   
-  if(mesh.getName() == "generator")
+  /*if(mesh.getName() == "generator")
   {
     mesh.setRoot(true);
   }
@@ -267,33 +293,26 @@ void setup()
   mesh.setContainsRoot(true);
 
   userScheduler.addTask( taskSendMessage );
-  taskSendMessage.enable();
+  taskSendMessage.enable();*/
 
-  userScheduler.addTask(printWifiRSSITask);
-  printWifiRSSITask.enable();
+  //userScheduler.addTask(printWifiRSSITask);
+//  /printWifiRSSITask.enable();
 
   userScheduler.addTask(calculateDistanceFromRSSITask);
   calculateDistanceFromRSSITask.enable();
 
 
-  userScheduler.addTask( taskPrintSubConnection );
-  taskPrintSubConnection.enable();
+  //userScheduler.addTask( taskPrintSubConnection );
+  //taskPrintSubConnection.enable();
   
-  if(mesh.isRoot())
-  {
-    Serial.println("This device is root, starting printNetworkTask");
-    
-  } else {
-    Serial.println("This device is not setup to be root");
-  }
 
   setupNeoPixel();
 }
 
 void loop() {
   // it will run the user scheduler as well
-  mesh.update();
   neopixelLoop();
+  userScheduler.execute();
 }
 
 
