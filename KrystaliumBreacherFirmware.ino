@@ -1,7 +1,15 @@
-// NOTE; In order for the namedmesh to work, you need to simlink the files into the arduino folder. What i did; I downloaded the painless mesh and replaced the src folder with the
-//painless mesh version that i've added
 
-#include <ESP8266WiFi.h>
+#if defined(ESP32)
+  #include <WiFi.h>
+  #define IS_GENERATOR true
+#elif defined(ESP8266)
+  #include <ESP8266WiFi.h>
+  #define IS_GENERATOR false
+#else
+  #error "Only ESP8266 or ESP32 board"
+#endif
+
+
 
 #include "namedMesh.h" // Use a variant of the painless mesh that allows for names instead of just unique ID's
 #include "kalman_simple.h"
@@ -101,13 +109,12 @@ Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUMPIXELS, LEDRINGPIN, NEO_GRB + NEO
 void printSubConnection();
 void printWifiRSSI();
 void calculateDistanceFromRSSI();
+void handleNumConnectedDevcies();
 
 String nodeName;
 
-//Task taskSendMessage( TASK_SECOND * 1 , TASK_FOREVER, &sendMessage );
-//Task taskPrintSubConnection(TASK_SECOND * 1, TASK_FOREVER, &printSubConnection);
-//Task printWifiRSSITask(TASK_SECOND * 1, TASK_FOREVER, &printWifiRSSI);
 Task calculateDistanceFromRSSITask(TASK_SECOND * 0.5, TASK_FOREVER, &calculateDistanceFromRSSI);
+Task handleNumConnectedDevicesTask(TASK_SECOND * 5, TASK_FOREVER, &handleNumConnectedDevcies);
 
 
 float reference_power  = -54; // rssi reference (Power at 1 meter)
@@ -118,6 +125,13 @@ double last_wifi_rssi = -50;
 
 double intensity_factor = 0; // Goes from 0 to 1, defined by how far the device is away from the generator
 
+
+void handleNumConnectedDevcies()
+{
+  Serial.print("Stations connected: ");
+  Serial.println(WiFi.softAPgetStationNum());
+}
+
 float getDistance(const float rssi)
 { 
   return pow(10, (reference_power - rssi) / (10 * distance_factor)); 
@@ -125,8 +139,13 @@ float getDistance(const float rssi)
 
 
 void calculateDistanceFromRSSI()
-{
-  last_wifi_rssi = (double)WiFi.RSSI();
+{ 
+  if(WiFi.status() != WL_CONNECTED)
+  {
+    last_wifi_rssi = -75;
+  } else {
+    last_wifi_rssi = (double)WiFi.RSSI();
+  }
   Serial.print("wifi_rssi: "); Serial.println(last_wifi_rssi);
   rssi_average = (double)myFilter.getFilteredValue(last_wifi_rssi);
   Serial.print("wifi_average: "); Serial.println(rssi_average);
@@ -139,12 +158,6 @@ void calculateDistanceFromRSSI()
   strip.show();
 }
 
-void printSubConnection()
-{
-  //Serial.println(mesh.subConnectionJson());
-  //taskPrintSubConnection.setInterval(TASK_SECOND * 10);
-}
-
 void setFlickerIntensity(byte intensity, int group_index)
 {
   int led_index = group_index * (NUMPIXELS / NUM_LED_GROUPS);
@@ -152,7 +165,8 @@ void setFlickerIntensity(byte intensity, int group_index)
   int secondary_intensity;
   int impurity_base = impurity[group_index] / 2;
   int impurity_intensity = impurity_base + (impurity_base * ((float)intensity / (float)FLICKER_MAX_INTENSITY));
-  
+
+
   // Clamp intensity between max and absolute min.
   intensity = MAXVAL(MINVAL(intensity, FLICKER_MAX_INTENSITY), FLICKER_ABSOLUTE_MIN_INTENSITY);
 
@@ -177,7 +191,6 @@ void setFlickerIntensity(byte intensity, int group_index)
     strip.setPixelColor(led_index, impurity_intensity, secondary_intensity, intensity); 
   }
 
-  
   strip.show();
   return;
 }
@@ -201,32 +214,19 @@ void setupNeoPixel()
     setFlickerState(BRIGHT, group_index);
     impurity[group_index] = int (random(MIN_IMPURITY, MAX_IMPURITY) + 0.5);
   }
-  strip.begin();
-}
-
-String findName(uint32_t node_id)
-{
-  // Yeaaah i know. It's a bit ugly hardcoded, but it's for a quick test.
-  if(node_id == 844612482)
+  // Clear the strip of previous values
+  for(int i = 0; i < NUMPIXELS; i++)
   {
-    return "generator";
-  } else if(node_id == 4225208703) 
-  {
-    return "device_a";
-  } else if(node_id == 4225251478)
-  {
-    return "device_b";
+    strip.setPixelColor(i, 0, 0, 0); 
   }
-  return "unset";
+  strip.begin();
+  strip.show();
 }
 
 
 void setup() 
 {
   Serial.begin(115200);
-
-  //mesh.setDebugMsgTypes( ERROR | MESH_STATUS | CONNECTION | SYNC | COMMUNICATION | GENERAL | MSG_TYPES | REMOTE ); // all types on
-  //mesh.setDebugMsgTypes( ERROR | CONNECTION | SYNC);  // set before init() so that you can see startup messages
   
   uint8_t MAC[] = {0, 0, 0, 0, 0, 0};
   WiFi.softAPmacAddress(MAC);
@@ -236,12 +236,10 @@ void setup()
   Serial.print("Node id is:");
   Serial.println(nodeId);
 
-
-  
-  if(nodeId == 2381691634)
+  if(IS_GENERATOR)
   {
     Serial.println("Server!");
-    WiFi.softAP(MESH_PREFIX, MESH_PASSWORD, 1, false, 8);             // Start the access point
+    WiFi.softAP(MESH_PREFIX, MESH_PASSWORD, 1, false, 12);             // Start the access point
     Serial.print("Access Point \"");
     Serial.print(MESH_PREFIX);
     Serial.println("\" started");
@@ -249,6 +247,10 @@ void setup()
     Serial.print("IP address:\t");
     Serial.println(WiFi.softAPIP());         // Send the IP address of the ESP8266 to the computer 
     Serial.println("Starting in WIFI_AP mode");
+
+    userScheduler.addTask(handleNumConnectedDevicesTask);
+    calculateDistanceFromRSSITask.enable();
+    
     //mesh.init(MESH_PREFIX, MESH_PASSWORD, &userScheduler, MESH_PORT, WIFI_AP);
   } else {
     Serial.println("Starting in WIFI_STA mode");
@@ -258,7 +260,7 @@ void setup()
     WiFi.begin(MESH_PREFIX, MESH_PASSWORD); 
     Serial.print("Connecting to ");
     Serial.print(MESH_PREFIX); Serial.println(" ...");
-
+    setupNeoPixel();
     int i = 0;
     while (WiFi.status() != WL_CONNECTED) { // Wait for the Wi-Fi to connect
       delay(1000);
@@ -272,8 +274,6 @@ void setup()
     //mesh.init(MESH_PREFIX, MESH_PASSWORD, &userScheduler, MESH_PORT, WIFI_STA);
     userScheduler.addTask(calculateDistanceFromRSSITask);
     calculateDistanceFromRSSITask.enable();
-
-    setupNeoPixel();
   }
 }
 
