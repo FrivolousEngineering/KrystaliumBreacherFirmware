@@ -71,7 +71,7 @@ Kalman myFilter(0.15, 20, 20, -50.);
 #define MAXVAL(A,B)             (((A) > (B)) ? (A) : (B))
 
 
-#define MAX_DISTANCE_METER               6
+#define MAX_DISTANCE_METER               3
 
 
 // This bizarre construct isn't Arduino code in the conventional sense.
@@ -231,14 +231,17 @@ void setup()
   uint8_t MAC[] = {0, 0, 0, 0, 0, 0};
   WiFi.softAPmacAddress(MAC);
   uint32_t nodeId = tcp::encodeNodeId(MAC); 
+
+  delay(200);
+  Serial.print("Node id is:");
   Serial.println(nodeId);
 
 
   
-  if(nodeId == 844612482)
+  if(nodeId == 2381691634)
   {
     Serial.println("Server!");
-    WiFi.softAP(MESH_PREFIX, MESH_PASSWORD);             // Start the access point
+    WiFi.softAP(MESH_PREFIX, MESH_PASSWORD, 1, false, 8);             // Start the access point
     Serial.print("Access Point \"");
     Serial.print(MESH_PREFIX);
     Serial.println("\" started");
@@ -267,46 +270,11 @@ void setup()
     Serial.print("IP address:\t");
     Serial.println(WiFi.localIP()); 
     //mesh.init(MESH_PREFIX, MESH_PASSWORD, &userScheduler, MESH_PORT, WIFI_STA);
+    userScheduler.addTask(calculateDistanceFromRSSITask);
+    calculateDistanceFromRSSITask.enable();
+
+    setupNeoPixel();
   }
-
-  //mesh.init(MESH_PREFIX, MESH_PASSWORD, &userScheduler, MESH_PORT);
-  //nodeName = findName(mesh.getNodeId());
-  //mesh.setName(nodeName);
-
-  //mesh.onReceive([](String &from, String &msg) {
-    //Serial.printf("Received message by name from: %s, \"%s\"\n", from.c_str(), msg.c_str());
-  //});
-
-  //mesh.onChangedConnections([]() {
-  //  Serial.printf("Changed connection\n");
-//  /});
-
-  
-  /*if(mesh.getName() == "generator")
-  {
-    mesh.setRoot(true);
-  }
-
-  Serial.printf("This node is known as: %s\n", mesh.getName().c_str());
-  
-  // Tell the network that there is a root. 
-  mesh.setContainsRoot(true);
-
-  userScheduler.addTask( taskSendMessage );
-  taskSendMessage.enable();*/
-
-  //userScheduler.addTask(printWifiRSSITask);
-//  /printWifiRSSITask.enable();
-
-  userScheduler.addTask(calculateDistanceFromRSSITask);
-  calculateDistanceFromRSSITask.enable();
-
-
-  //userScheduler.addTask( taskPrintSubConnection );
-  //taskPrintSubConnection.enable();
-  
-
-  setupNeoPixel();
 }
 
 void loop() {
